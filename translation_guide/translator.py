@@ -1,3 +1,5 @@
+# 번역 모듈
+
 import re
 from typing import Dict, List, Tuple
 

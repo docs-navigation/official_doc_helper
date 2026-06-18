@@ -11,23 +11,23 @@ class TranslatorManager:
         self.action_guide = GuideGenerator()
 
     def process_document(self, text: str, doc_type: str) -> Dict:
-        # 1. 번역 수행
+        # 번역 수행
         translated_text, translation_changes = self.translator.translate_doc(text)
         translated_text = self.translator.simplify_structure(translated_text)
 
-        # 2. 마감일 추출
+        # 마감일 추출
         deadline = self.action_guide.extract_deadline(text)
 
-        # 3. 긴급도 분석
+        # 긴급도 분석
         urgency = self.action_guide.analyze_urgency(text, deadline)
 
-        # 4. 행동 지침 생성
+        # 행동 지침 생성
         actions = self.action_guide.generate_actions(text, doc_type, urgency)
 
-        # 5. 전체 요약 생성
+        # 전체 요약 생성
         summary = self.action_guide.create_summary(text, doc_type, urgency, actions)
 
-        # 6. 결과 통합
+        # 결과 통합
         result = {
             'original_text': text,
             'translated_text': translated_text,
