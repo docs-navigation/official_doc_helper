@@ -1,6 +1,7 @@
 # 심각도 분류 로직
 
 from datetime import date
+import re
 
 from constants import (
     LEVEL_ORDER,
@@ -8,12 +9,59 @@ from constants import (
     LEGAL_FORCE_KEYWORDS,
     DOC_TYPE_LEVELS,
     IMPORTANT_KEYWORDS,
+    KEYWORD_EXCLUSIONS,
 )
 
 
 # 두 심각도 중 더 높은 단계 반환
 def _higher(a, b):
     return a if LEVEL_ORDER.index(a) <= LEVEL_ORDER.index(b) else b
+
+
+# 키워드 비교용 문자열 정규화
+def _compact(text):
+    if not text:
+        return ""
+
+    return re.sub(
+        r"[\s\-_·ㆍ:：,./()\[\]{}<>「」『』'\"“”‘’]",
+        "",
+        text
+    )
+
+# 키워드가 텍스트에 실제 의미로 등장하는지 확인
+# 제외 표현(예: '구속력')으로만 등장하면 오탐으로 보고 매칭하지 않음
+def _keyword_in_text(keyword, text):
+    if not keyword or not text:
+        return False
+
+    if keyword in text:
+        for term in KEYWORD_EXCLUSIONS.get(keyword, []):
+            if term in text:
+                if text.count(keyword) <= text.count(term):
+                    return False
+        return True
+    
+
+
+    compact_keyword = _compact(keyword)
+
+    # 2글자 이하의 짧은 키워드는 compact 비교 시 오탐 가능성이 커서 제외
+    if len(compact_keyword) <= 2:
+        return False
+    
+    compact_text = _compact(text)
+
+    if compact_keyword not in compact_text:
+        return False
+
+    for term in KEYWORD_EXCLUSIONS.get(keyword, []):
+        compact_term = _compact(term)
+        if compact_term and compact_term in compact_text:
+            if compact_text.count(compact_keyword) <= compact_text.count(compact_term):
+                return False
+
+    return True
 
 
 # 키워드 탐색
@@ -27,7 +75,7 @@ def _check_keywords(text, keyword_map, label):
         matched = [
             keyword
             for keyword in keywords
-            if keyword in text
+            if _keyword_in_text(keyword, text)
         ]
 
         if matched:
@@ -53,9 +101,14 @@ def _check_deadline(deadline_str):
         deadline = date.fromisoformat(deadline_str)
         days_left = (deadline - date.today()).days
 
+        # 기한 초과는 즉각 대응이 필요하므로 심각
         if days_left < 0:
             level = _higher(level, "심각")
-            reasons.append(f"납부/제출 기한 {abs(days_left)}일 초과 - 즉각 대응 필요")
+            reasons.append(f"기한 {abs(days_left)}일 초과 - 즉각 대응 필요")
+
+        elif days_left == 0:
+            level = _higher(level, "심각")
+            reasons.append("기한 당일 - 즉각 대응 필요")
 
         else:
             for threshold, sev, msg in DEADLINE_RULES:
