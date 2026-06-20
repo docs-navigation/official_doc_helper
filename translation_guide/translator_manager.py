@@ -45,7 +45,7 @@ class TranslatorManager:
             'actions': actions,
             'summary': summary,
             'document_type': doc_type,
-            'metadata': {'data_source': self.translator.add_attribution()}
+            'metadata': {'data_source': "Public Document Analysis System v1.0"}
         }
 
         return result
