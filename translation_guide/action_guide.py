@@ -1,96 +1,131 @@
 # 행동 지침 분석 모듈
 
-from typing import Dict, List
+from typing import Dict, List, Union, Optional
 from datetime import datetime, timedelta
 import re
 
 class GuideGenerator:
-    def __init__(self):
-        # 긴급도 키워드
-        self.urgency_keywords = {
-            'critical': ['압류', '경매', '강제집행', '명도', '퇴거', '출석', '출두'],
-            'high': ['납부기한', '답변서', '이의신청', '체납', '독촉'],
-            'medium': ['고지', '통지', '안내', '계약'],
-            'low': ['확인', '조회', '참고']
-        }
-
-        # 문서 유형별 행동 템플릿
-        self.action_templates = {
-            'tax': self._generate_tax_actions,
-            'court': self._generate_court_actions,
-            'real_estate': self._generate_real_estate_actions,
-            'general': self._generate_general_actions
-        }
-
     # 행동 지침 생성
-    def generate_guide(self, text: str, doc_type: str = "general") -> Dict:
-        deadline = self.extract_deadline(text)
-        urgency = self.analyze_urgency(text, deadline)
-        actions = self.generate_actions(text, doc_type, urgency)
-        summary = self.create_summary(text, doc_type, urgency, actions)
+    def generate_guide(self, classified_doc: Union[Dict, str], doc_type: str = "일반 문서") -> Dict:
+        if isinstance(classified_doc, str):
+            doc = {
+                "ocr_text": classified_doc,
+                "extracted_info": {
+                    "doc_type": doc_type
+                },
+                "severity": {
+                    "level": "일반",
+                    "reason": []
+                }
+            }
+        else:
+            doc = classified_doc or {}
 
-        return summary
+        text = doc.get("ocr_text", "")
+        extracted_info = doc.get("extracted_info") or {}
+        severity = doc.get("severity") or {}
 
-    def analyze_urgency(self, text: str, deadline: datetime = None) -> Dict:
-        urgency_level = 'low'
-        reasons = []
+        level = severity.get("level", "일반")
+        reasons = severity.get("reason", [])
 
-        # 키워드 기반 긴급도 판단
-        for level, keywords in self.urgency_keywords.items():
-            for keyword in keywords:
-                if keyword in text:
-                    if level == 'critical':
-                        urgency_level = 'critical'
-                        reasons.append(f'"{keyword}" 발견 - 즉시 대응 필요')
-                    elif level == 'high' and urgency_level != 'critical':
-                        urgency_level = 'high'
-                        reasons.append(f'"{keyword}" 발견 - 빠른 대응 필요')
-                    elif level == 'medium' and urgency_level == 'low':
-                        urgency_level = 'medium'
-                        reasons.append(f'"{keyword}" 발견')
+        deadline = extracted_info.get("deadline")
+        detected_doc_type = (
+            extracted_info.get("doc_type")
+            or doc.get("document_type")
+            or doc_type
+            or "일반 문서"
+        )
 
-        # 마감일 기반 긴급도 조정
-        if deadline:
-            days_left = (deadline - datetime.now()).days
-            if days_left <= 3:
-                urgency_level = 'critical'
-                reasons.append(f'마감까지 {days_left}일 남음')
-            elif days_left <= 7:
-                if urgency_level not in ['critical']:
-                    urgency_level = 'high'
-                reasons.append(f'마감까지 {days_left}일 남음')
-            elif days_left < 0:
-                urgency_level = 'critical'
-                reasons.append('마감일이 이미 지남')
+        # 카테고리 분류
+        category = self._detect_category(detected_doc_type, text)
+
+        # 행동 지침 생성
+        actions = self._generate_actions(
+            category = category,
+            level = level,
+            deadline = deadline,
+            doc_type = detected_doc_type,
+            text = text
+        )
+
+        # 도움 연락처 제공
+        help_contacts = self._get_help_contacts(category)
 
         return {
-            'level': urgency_level,
-            'reasons': reasons,
-            'deadline': deadline
+            "urgency_level": level,
+            "urgency_label": self._level_to_label(level),
+            "deadline": deadline,
+            "doc_type": detected_doc_type,
+            "document_type": detected_doc_type,
+            "category": category,
+            "reasons": reasons,
+            "main_message": self._create_main_message(
+                level=level,
+                doc_type=detected_doc_type,
+                deadline=deadline
+            ),
+            "actions": actions,
+            "help_contacts": help_contacts
+        }
+    
+    def _level_to_label(self, level: str) -> str:
+        label_map = {
+            "심각": "매우 긴급",
+            "경고": "긴급",
+            "주의": "주의",
+            "일반": "일반"
         }
 
-    def extract_deadline(self, text: str) -> datetime:
-        # 날짜 패턴 매칭
-        date_patterns = [
-            r'(\d{4})년\s*(\d{1,2})월\s*(\d{1,2})일',
-            r'(\d{4})-(\d{2})-(\d{2})',
-            r'(\d{4})\.(\d{2})\.(\d{2})'
+        return label_map.get(level, level)
+
+    def _detect_category(self, doc_type: str, text: str) -> str:
+        doc_type = doc_type or ""
+        text = text or ""
+        combined = doc_type + " " + text
+
+        real_estate_keywords = [
+            "임대차", "전세", "월세", "보증금", "임대인", "임차인",
+            "계약해지", "계약만료", "부동산", "등기부", "등기사항",
+            "근저당", "전입신고", "확정일자", "원상복구", "하자"
         ]
 
-        for pattern in date_patterns:
-            match = re.search(pattern, text)
-            if match:
-                year, month, day = map(int, match.groups())
-                try:
-                    return datetime(year, month, day)
-                except ValueError:
-                    continue
+        court_keywords = [
+            "소장", "답변서", "출석", "출두", "소환", "변론기일",
+            "판결", "지급명령", "보정명령", "공소장", "고소장", "고발장",
+            "구속영장", "체포영장", "강제집행", "압류", "가압류",
+            "경매", "추심명령", "전부명령", "약식명령"
+        ]
 
-        return None
+        tax_keywords = [
+            "세금", "납세", "납부", "고지서", "체납", "독촉",
+            "재산세", "종합소득세", "부가가치세", "지방세", "국세",
+            "과태료", "범칙금", "가산금", "가산세", "건강보험료",
+            "국민연금", "관리비"
+        ]
 
-    def generate_actions(self, text: str, doc_type: str, urgency: Dict) -> List[Dict]:
-        generator = self.action_templates.get(doc_type, self._generate_general_actions)
-        return generator(text, urgency)
+        if any(keyword in combined for keyword in real_estate_keywords):
+            return "real_estate"
+
+        if any(keyword in combined for keyword in court_keywords):
+            return "court"
+
+        if any(keyword in combined for keyword in tax_keywords):
+            return "tax"
+
+        return "general"
+
+    # 행동 지침 생성
+    def _generate_actions(self, category: str, level: str, deadline: str, doc_type: str, text: str) -> List[Dict]:
+        urgency_dict = {'level': level, 'deadline': deadline}
+
+        if category == "tax":
+            return self._generate_tax_actions(text, urgency_dict)
+        elif category == "court":
+            return self._generate_court_actions(text, urgency_dict)
+        elif category == "real_estate":
+            return self._generate_real_estate_actions(text, urgency_dict)
+        else:
+            return self._generate_general_actions(text, urgency_dict)
 
     # 세금 관련 행동 지침
     def _generate_tax_actions(self, text: str, urgency: Dict) -> List[Dict]:
@@ -110,7 +145,7 @@ class GuideGenerator:
                 'detail': '은행, ATM, 인터넷뱅킹, 위택스(wetax.go.kr)에서 납부할 수 있습니다.'
             })
 
-            if urgency['level'] in ['critical', 'high']:
+            if urgency['level'] in ['심각', '경고']:
                 actions.append({
                     'priority': 3,
                     'action': '즉시 납부 또는 분할납부 신청',
@@ -151,7 +186,7 @@ class GuideGenerator:
                 'detail': '지정된 날짜에 법원에 출석하세요. 관련 서류를 모두 준비하세요.'
             })
 
-        if urgency['level'] == 'critical':
+        if urgency['level'] == '심각':
             actions.append({
                 'priority': 1,
                 'action': '긴급 대응 필요',
@@ -201,82 +236,41 @@ class GuideGenerator:
         ]
 
         if urgency['deadline']:
+            deadline_val = urgency['deadline']
             actions.insert(1, {
                 'priority': 1,
                 'action': '마감일 확인',
-                'detail': f"마감일: {urgency['deadline'].strftime('%Y년 %m월 %d일')}"
+                'detail': f"마감일: {deadline_val}까지 필요한 조치를 완료하세요."
             })
 
         return actions
+    
+    def _create_main_message(self, level: str, doc_type: str, deadline: str) -> str:
+        deadline_text = f" 기한은 {deadline}입니다." if deadline else ""
 
-    def create_summary(self, text: str, doc_type: str, urgency: Dict, actions: List[Dict]) -> Dict:
-        urgency_labels = {
-            'critical': '🚨 매우 긴급',
-            'high': '⚠️ 긴급',
-            'medium': '📌 보통',
-            'low': 'ℹ️ 참고'
-        }
+        if level == "심각":
+            return f"{doc_type} 문서입니다.{deadline_text} 법적 조치나 불이익 가능성이 있으니 즉시 확인해야 합니다."
 
-        return {
-            'urgency_label': urgency_labels[urgency['level']],
-            'urgency_level': urgency['level'],
-            'main_message': self._get_main_message(doc_type, urgency['level']),
-            'deadline': urgency['deadline'],
-            'actions': sorted(actions, key=lambda x: x['priority']),
-            'help_contacts': self._get_help_contacts(doc_type)
-        }
+        if level == "경고":
+            return f"{doc_type} 문서입니다.{deadline_text} 빠른 확인과 대응이 필요합니다."
 
-    def _get_main_message(self, doc_type: str, urgency_level: str) -> str:
-        messages = {
-            'tax': {
-                'critical': '세금을 즉시 납부하거나 분할납부를 신청해야 합니다.',
-                'high': '세금 납부 기한이 얼마 남지 않았습니다.',
-                'medium': '세금 납부 관련 안내입니다.',
-                'low': '세금 관련 안내 사항입니다.'
-            },
+        if level == "주의":
+            return f"{doc_type} 문서입니다.{deadline_text} 기한과 요구사항을 확인해야 합니다."
 
-            'court': {
-                'critical': '법적 조치가 임박했습니다. 즉시 법률 상담을 받으세요.',
-                'high': '법원 문서입니다. 빠른 대응이 필요합니다.',
-                'medium': '법원에서 보낸 통지입니다.',
-                'low': '법원 관련 안내 사항입니다.'
-            },
+        return f"{doc_type} 문서입니다.{deadline_text} 내용을 확인하고 필요한 경우 보관하세요."
 
-            'real_estate': {
-                'critical': '부동산 계약 관련 긴급 사항입니다.',
-                'high': '부동산 계약 관련 중요 통지입니다.',
-                'medium': '부동산 계약 안내입니다.',
-                'low': '부동산 관련 안내 사항입니다.'
-            },
-
-            'general': {
-                'critical': '기한이 지났거나 빠른 대응이 필요한 문서입니다.',
-                'high': '빠른 확인이 필요한 행정 문서입니다.',
-                'medium': '확인이 필요한 행정 문서입니다.',
-                'low': '일반 행정 문서입니다.'
-            }
-        }
-
-        return messages.get(doc_type, {}).get(urgency_level, '문서를 확인하세요.')
-
-    def _get_help_contacts(self, doc_type: str) -> List[Dict]:
-        common = [
-            {'name': '정부민원콜센터', 'number': '110', 'desc': '정부 관련 모든 민원 상담'}
+    def _get_help_contacts(self, category: str) -> List[Dict]:
+        common_contacts = [
+            {"name": "정부민원안내콜센터", "number": "110", "desc": "일반 민원 상담"}
         ]
 
-        specific = {
-            'tax': [
-                {'name': '국세상담센터', 'number': '126', 'desc': '세금 관련 상담'},
-                {'name': '위택스', 'number': '1544-1414', 'desc': '지방세 납부 및 상담'}
-            ],
-            'court': [
-                {'name': '법률구조공단', 'number': '132', 'desc': '무료 법률 상담'},
-                {'name': '대한법률구조공단', 'number': '1600-5050', 'desc': '법률 지원'}
-            ],
-            'real_estate': [
-                {'name': '주거복지센터', 'number': '1600-0777', 'desc': '주거 관련 상담'},
-                {'name': '부동산거래관리시스템', 'number': '1588-0149', 'desc': '부동산 거래 상담'}
-            ]
-        }
+        if category == "tax":
+            return common_contacts + [{"name": "국세상담센터", "number": "126", "desc": "세금 관련 상담"}]
 
-        return common + specific.get(doc_type, [])
+        if category == "court":
+            return common_contacts + [{"name": "대한법률구조공단", "number": "132", "desc": "법률 상담"}]
+
+        if category == "real_estate":
+            return common_contacts + [{"name": "법률상담", "number": "132", "desc": "임대차, 보증금, 계약 분쟁 상담"}]
+
+        return common_contacts

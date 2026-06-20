@@ -3,49 +3,77 @@
 from typing import Dict, List
 from translator import DocTranslator
 from action_guide import GuideGenerator
-import json
+from classification_manager import ClassificationManager
 
 class TranslatorManager:
     def __init__(self):
         self.translator = DocTranslator()
         self.action_guide = GuideGenerator()
+        self.classifier = ClassificationManager()
 
     def process_document(self, text: str, doc_type: str) -> Dict:
         # 번역 수행
         translated_text, translation_changes = self.translator.translate_doc(text)
-        translated_text = self.translator.simplify_structure(translated_text)
 
-        # 마감일 추출
-        deadline = self.action_guide.extract_deadline(text)
+        if hasattr(self.translator, "simplify_structure"):
+            translated_text = self.translator.simplify_structure(translated_text)
 
-        # 긴급도 분석
-        urgency = self.action_guide.analyze_urgency(text, deadline)
+        # 심각도 / 기한 / 문서종류 추출
+        doc = {
+            "ocr_text": text,
+            "extracted_info": {}
+        }
+
+        if doc_type and doc_type != "general":
+            doc["document_type"] = doc_type
+
+        classified_doc = self.classifier.process(doc)
+
+        extracted_info = classified_doc.get("extracted_info", {})
+        severity = classified_doc.get("severity", {})
+        deadline = extracted_info.get("deadline")
+
+        detected_doc_type = (
+            extracted_info.get("doc_type")
+            or classified_doc.get("document_type")
+            or doc_type
+            or "일반 문서"
+        )
 
         # 행동 지침 생성
-        actions = self.action_guide.generate_actions(text, doc_type, urgency)
+        guide_result = self.action_guide.generate_guide(
+            classified_doc,
+            doc_type=detected_doc_type
+        )
 
-        # 전체 요약 생성
-        summary = self.action_guide.create_summary(text, doc_type, urgency, actions)
+        actions = guide_result.get("actions", [])
 
         # 결과 통합
         result = {
-            'original_text': text,
-            'translated_text': translated_text,
-            'translation': {
-                'changes': translation_changes,
-                'term_count': len(translation_changes)
+            "original_text": text,
+            "ocr_text": text,
+            "translated_text": translated_text,
+            "translation": {
+                "changes": translation_changes,
+                "term_count": len(translation_changes)
             },
 
-            'urgency': {
-                'level': urgency['level'],
-                'reasons': urgency['reasons'],
-                'deadline': deadline.strftime('%Y-%m-%d') if deadline else None
+            "extracted_info": extracted_info,
+            "severity": severity,
+            "urgency": {
+                "level": severity.get("level", "일반"),
+                "label": guide_result.get("urgency_label", severity.get("level", "일반")),
+                "reasons": severity.get("reason", []),
+                "deadline": deadline
             },
-
-            'actions': actions,
-            'summary': summary,
-            'document_type': doc_type,
-            'metadata': {'data_source': "Public Document Analysis System v1.0"}
+            "actions": actions,
+            "summary": {
+                "urgency_label": guide_result.get("urgency_label", severity.get("level", "일반")),
+                "main_message": guide_result.get("main_message", "문서 내용을 확인하세요."),
+                "help_contacts": guide_result.get("help_contacts", [])
+            },
+            "document_type": detected_doc_type,
+            "metadata": {"data_source": "Public Document Analysis System v1.0"}
         }
 
         return result
@@ -60,13 +88,16 @@ class TranslatorManager:
 
         # 긴급도
         output.append(f"긴급도: {result['summary']['urgency_label']}")
-        output.append(f"{result['summary']['main_message']}")
+        output.append(f"요약: {result['summary']['main_message']}")
         output.append("")
 
         # 마감일
-        if result['urgency']['deadline']:
-            output.append(f"마감일: {result['urgency']['deadline']}")
-            output.append("")
+        deadline = result['urgency']['deadline']
+        if deadline:
+            output.append(f"마감일: {deadline}")
+        else:
+            output.append("마감일: 확인된 기한 없음 (원문 재확인 권장)")
+        output.append("")
 
         # 번역된 내용
         output.append("쉬운 설명:")
@@ -75,20 +106,25 @@ class TranslatorManager:
         output.append("")
 
         # 행동 지침
+        actions = result.get('actions', [])
         output.append("해야 할 일:")
         output.append("-" * 50)
-        for i, action in enumerate(result['actions'], 1):
-            output.append(f"{i}. {action['action']}")
-            output.append(f"   → {action['detail']}")
-            output.append("")
+        if actions:
+            for i, action in enumerate(actions, 1):
+                output.append(f"{i}. {action['action']}")
+                output.append(f"   → {action['detail']}")
+        else:
+            output.append("특이사항이 없습니다.")
+        output.append("")
 
         # 도움 연락처
-        output.append("도움받을 곳:")
-        output.append("-" * 50)
-        for contact in result['summary']['help_contacts']:
-            output.append(f"• {contact['name']}: {contact['number']}")
-            output.append(f"  ({contact['desc']})")
-        output.append("")
+        contacts = result['summary'].get('help_contacts', [])
+        if contacts:
+            output.append("도움받을 곳")
+            output.append("-" * 50)
+            for contact in contacts:
+                output.append(f"• {contact['name']}: {contact['number']} ({contact['desc']})")
+            output.append("")
 
         output.append("=" * 50)
 
