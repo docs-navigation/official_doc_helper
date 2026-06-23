@@ -1,7 +1,17 @@
 # 통합 UI - 전체 파이프라인 흐름
 # 문서 인식 및 추출 모듈(OCR) -> 심각도 분류 모듈 -> 번역 및 행동지침 모듈
 
+import sys
+import os
+
+# 모듈이 폴더별로 나뉘어 있어, 각 폴더를 import 경로에 추가
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(os.path.join(HERE, "ocr_module"))
+sys.path.append(os.path.join(HERE, "severity_classification_module"))
+sys.path.append(os.path.join(HERE, "translation_guide_module"))
+
 import streamlit as st
+from ocr_pipeline import run_ocr as ocr_run_ocr
 from classification_manager import ClassificationManager
 from translator_manager import TranslatorManager
 from translator_ui import render_translation_page, render_finish_page
@@ -107,33 +117,13 @@ st.markdown(
 )
 
 
-# OCR 모듈 연결 지점
-# 실제 OCR 모듈의 full_pipeline로 교체. 지금은 OCR 연결 전 레이아웃 테스트용 샘플 doc 반환
-def run_ocr(uploaded_file):
-    # TODO: 실제 OCR 모듈 연결
-    #   from ocr_pipeline import full_pipeline
-    #   path = save_temp(uploaded_file)
-    #   return full_pipeline(path)
-    return {
-        "doc_id": "uploaded",
-        "input_type": "image",
-        "ocr_text": (
-            "재산세 납부 고지서\n"
-            "귀하의 재산세가 체납되었습니다. "
-            "기한 내 미납 시 압류 등 강제집행이 진행될 수 있습니다.\n"
-            "납부기한: 2026년 7월 15일"
-        ),
-        "extracted_info": {},
-        "severity": {},
-        "easy_summary": "",
-        "action_guide": {}
-    }
-
-
-# 전체 파이프라인 실행 
+# 전체 파이프라인 실행
 def run_pipeline(uploaded_file):
     # 1. OCR 모듈
-    doc = run_ocr(uploaded_file)
+    doc = ocr_run_ocr(uploaded_file)
+    if doc["needs_recapture"]:
+        return doc, None            # 깨진 문서는 분류/번역 돌리지 않고 멈춤
+
     # 2. 심각도 분류 모듈
     doc = ClassificationManager().process(doc)
     # 3. 번역/행동지침 모듈
@@ -145,12 +135,17 @@ def run_pipeline(uploaded_file):
 if "doc" not in st.session_state:
     st.session_state.doc = None
     st.session_state.result = None
+    st.session_state.uploader_key = 0   # 업로더를 초기화하기 위한 카운터
 
 
 st.markdown('<div class="app-title">공문서 번역 및 가이드 시스템</div>', unsafe_allow_html=True)
 
 st.markdown('<div class="category-header">문서 올리기</div>', unsafe_allow_html=True)
-uploaded = st.file_uploader("공문서 이미지를 올려주세요", type=["png", "jpg", "jpeg"])
+uploaded = st.file_uploader(
+    "공문서 이미지를 올려주세요",
+    type=["png", "jpg", "jpeg", "pdf"],
+    key=f"uploader_{st.session_state.uploader_key}" 
+)
 
 col_run, col_reset = st.columns([1, 1])
 with col_run:
@@ -163,6 +158,13 @@ with col_reset:
     if st.button("다시 하기", use_container_width=True):
         st.session_state.doc = None
         st.session_state.result = None
+        st.session_state.uploader_key += 1    # key를 바꿔서 업로더를 빈 상태로 리셋
+        st.rerun()                           
+
+# 재촬영 안내: OCR이 문서를 거의 못 읽은 경우
+# (run_pipeline이 needs_recapture에서 멈췄으면 result는 None)
+if st.session_state.doc and st.session_state.doc.get("needs_recapture"):
+    st.warning(st.session_state.doc.get("recapture_reason", "문서를 다시 올려주세요."))
 
 # 결과가 있으면 단계별 페이지 표시
 if st.session_state.result:
@@ -228,10 +230,10 @@ if st.session_state.result:
             reason_html = '<div class="reason-item">• 특이사항 없음</div>'
         st.markdown(f'<div class="app-card">{reason_html}</div>', unsafe_allow_html=True)
 
-    # 3. 번역 결과 
+    # 3. 번역 결과
     elif page == "3. 번역 결과":
         render_translation_page(result)
 
-    # 4. 행동 지침 
+    # 4. 행동 지침
     else:
         render_finish_page(result)
