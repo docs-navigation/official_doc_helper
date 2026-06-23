@@ -249,15 +249,15 @@ class GuideGenerator:
         deadline_text = f" 기한은 {deadline}입니다." if deadline else ""
 
         if level == "심각":
-            return f"{doc_type} 문서입니다.{deadline_text} 법적 조치나 불이익 가능성이 있으니 즉시 확인해야 합니다."
+            return f"{doc_type} 입니다.{deadline_text} 법적 조치나 불이익 가능성이 있으니 즉시 확인해야 합니다."
 
         if level == "경고":
-            return f"{doc_type} 문서입니다.{deadline_text} 빠른 확인과 대응이 필요합니다."
+            return f"{doc_type} 입니다.{deadline_text} 빠른 확인과 대응이 필요합니다."
 
         if level == "주의":
-            return f"{doc_type} 문서입니다.{deadline_text} 기한과 요구사항을 확인해야 합니다."
+            return f"{doc_type} 입니다.{deadline_text} 기한과 요구사항을 확인해야 합니다."
 
-        return f"{doc_type} 문서입니다.{deadline_text} 내용을 확인하고 필요한 경우 보관하세요."
+        return f"{doc_type} 입니다.{deadline_text} 내용을 확인하고 필요한 경우 보관하세요."
 
     def _get_help_contacts(self, category: str) -> List[Dict]:
         common_contacts = [
