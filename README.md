@@ -129,6 +129,7 @@
 - PyMuPDF
 - OpenCV
 - NumPy
+- torch
 
 #### 실행
 
@@ -160,6 +161,81 @@
 ---
 
 ## 모델 학습 방법
+
+본 시스템에서 직접 학습한 모델은 문서 영역 검출용 YOLO 모델이다. 텍스트 인식에 사용하는 EasyOCR은 한국어·영어 사전 학습 모델을 그대로 사용하며, 별도의 학습은 진행하지 않았다.
+
+#### 학습 목표
+
+촬영된 사진에서 배경을 제외하고 종이 문서 영역(paper)만 검출한 뒤 해당 영역을 잘라내어, 불필요한 배경으로 인한 OCR 오인식을 줄이는 것을 목표로 한다.
+
+#### 데이터셋
+
+-공문서 촬영 이미지와 VOC(XML) 형식의 바운딩 박스 주석으로 구성 (dataset.zip)
+-클래스: paper 단일 클래스
+-VOC(XML) 주석을 YOLO 형식(정규화된 cx, cy, w, h)으로 변환
+-학습/검증 데이터를 8:2 비율로 무작위 분할 (random.seed(42)로 재현성 확보)
+
+
+#### 학습 환경 및 설정
+
+-Google Colab (GPU 런타임)
+-Ultralytics YOLO
+
+| 항목             | 값                  |
+| ---------------- | ------------------- |
+|Base model        |YOLOv8n (yolov8n.pt) |
+|epochs            |50                   |
+|imgsz             |640                  |
+|batch             |8                    |
+
+#### 학습 절차
+
+1.dataset.zip 압축 해제
+2.VOC(XML) 주석을 YOLO 라벨로 변환하고 train/val로 분할한 뒤 data.yaml 생성
+
+    ```yaml
+    path: /content/dataset
+    train: images/train
+    val: images/val
+    names:
+      0: paper
+    ```
+
+3.모델 학습
+
+    ```python
+    from ultralytics import YOLO
+
+    model = YOLO("yolov8n.pt")
+    model.train(data="/content/dataset/data.yaml",
+                epochs=50, imgsz=640, batch=8)
+    ```
+
+4.검증 (mAP50 측정)
+
+    ```python
+    model = YOLO("/content/runs/detect/train/weights/best.pt")
+    metrics = model.val()
+    print("mAP50:", metrics.box.map50)
+    ```
+    
+#### 학습 결과
+
+검증 데이터셋(val) 기준 성능은 다음과 같다.
+
+| 지표             | 값                  |
+| ---------------- | ------------------- |
+|Precision         |0.999                |
+|Recall            |1.000                |
+|mAP50             |0.995                |
+|mAP50-95          |0.862                |
+
+단일 클래스(paper) 검출 과제로, 한 이미지에 종이 영역이 크게 한 개 존재하는 단순한 형태이기 때문에 mAP50가 매우 높게 측정되었다. 실제 사용 환경에서는 EasyOCR 단계의 품질 검사(재촬영 판단)와 함께 동작하여 인식 안정성을 보완한다.
+
+#### 산출물
+- 학습 결과 가중치: runs/detect/train/weights/best.pt
+- 이 best.pt를 OCR 모듈(ocr_pipeline.py)이 문서 영역 검출에 사용한다.
+
 
 ---
 
