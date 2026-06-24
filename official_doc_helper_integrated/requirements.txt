@@ -1,0 +1,6 @@
+streamlit
+ultralytics
+easyocr
+pymupdf
+opencv-python
+numpy
