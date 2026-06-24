@@ -6,6 +6,8 @@
 
 본 저장소는 공문서 번역 및 가이드 시스템의 공식 구현 저장소입니다.
 
+---
+
 ## 프로젝트 개요
 
 세금 고지서, 법원 통지서, 부동산 계약서와 같은 공문서는 한자어, 법률 용어, 복잡한 행정 표현 및 서식으로 구성되어 있어 일반 사용자가 내용을 정확히 이해하기 어렵다. 특히 정보 소외 계층의 경우 문서를 제대로 이해하지 못해 기한을 놓치거나 법적 불이익을 받는 사례가 빈번하게 발생한다. 이러한 문제는 개인의 피해에 그치지 않고 행정 민원 증가와 사회적 비용 발생으로 이어질 수 있다.
@@ -60,6 +62,8 @@
     <img width="900" src="./images/img6.png">
     </p>
 
+---
+
 ## 주요 기능
 
 #### 문서 인식 및 추출 모듈
@@ -94,6 +98,8 @@
 - 어려운 행정 및 법률 용어를 쉬운 표현으로 변환
 - 이해하기 쉬운 설명 제공
 - 사용자 행동 가이드 제공
+
+---
 
 ## 기대 효과
 
@@ -130,18 +136,22 @@
     ```bash
     conda create -n official_doc_helper python=3.11
     ```
+    
 2. 가상환경 실행
     ```bash
     conda activate official_doc_helper
     ```
+    
 3. `official_doc_helper_integrated/` 폴더로 이동
     ```bash
     cd ./official_doc_helper_integrated/ # 폴더가 있는 경로에 맞게 수정
     ```
+    
 4. 패키지 설치
     ```bash
     pip install -r requirements.txt
     ```
+    
 5. `app.py` 실행
     ```bash
     streamlit run app.py
