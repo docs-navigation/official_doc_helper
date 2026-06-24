@@ -4,3 +4,4 @@ easyocr
 pymupdf
 opencv-python
 numpy
+torch
