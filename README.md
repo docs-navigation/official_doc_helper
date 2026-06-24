@@ -33,34 +33,34 @@
 #### 실행 결과
 
 - 초기 화면
-    <p align="center">
-    <img width="900" src="./images/img1.png">
-    </p>
+  <p align="center">
+  <img width="900" src="./images/img1.png">
+  </p>
 
 - 사진 삽입 시
-    <p align="center">
-    <img width="900" src="./images/img2.png">
-    </p>
+  <p align="center">
+  <img width="900" src="./images/img2.png">
+  </p>
 
 - 문서 인식 결과
-    <p align="center">
-    <img width="900" src="./images/img3.png">
-    </p>
+  <p align="center">
+  <img width="900" src="./images/img3.png">
+  </p>
 
 - 심각도 분류 결과
-    <p align="center">
-    <img width="900" src="./images/img4.png">
-    </p>
+  <p align="center">
+  <img width="900" src="./images/img4.png">
+  </p>
 
 - 번역 결과
-    <p align="center">
-    <img width="900" src="./images/img5.png">
-    </p>
+  <p align="center">
+  <img width="900" src="./images/img5.png">
+  </p>
 
 - 행동 지침 결과
-    <p align="center">
-    <img width="900" src="./images/img6.png">
-    </p>
+  <p align="center">
+  <img width="900" src="./images/img6.png">
+  </p>
 
 ---
 
@@ -129,7 +129,7 @@
 - PyMuPDF
 - OpenCV
 - NumPy
-- torch
+- PyTorch
 
 #### 실행
 
@@ -137,22 +137,18 @@
     ```bash
     conda create -n official_doc_helper python=3.11
     ```
-    
 2. 가상환경 실행
     ```bash
     conda activate official_doc_helper
     ```
-    
 3. `official_doc_helper_integrated/` 폴더로 이동
     ```bash
     cd ./official_doc_helper_integrated/ # 폴더가 있는 경로에 맞게 수정
     ```
-    
 4. 패키지 설치
     ```bash
     pip install -r requirements.txt
     ```
-    
 5. `app.py` 실행
     ```bash
     streamlit run app.py
@@ -170,23 +166,20 @@
 
 #### 데이터셋
 
--공문서 촬영 이미지와 VOC(XML) 형식의 바운딩 박스 주석으로 구성 (dataset.zip)
--클래스: paper 단일 클래스
--VOC(XML) 주석을 YOLO 형식(정규화된 cx, cy, w, h)으로 변환
--학습/검증 데이터를 8:2 비율로 무작위 분할 (random.seed(42)로 재현성 확보)
-
+-공문서 촬영 이미지와 VOC(XML) 형식의 바운딩 박스 주석으로 구성 (dataset.zip) -클래스: paper 단일 클래스
+-VOC(XML) 주석을 YOLO 형식(정규화된 cx, cy, w, h)으로 변환 -학습/검증 데이터를 8:2 비율로 무작위 분할 (random.seed(42)로 재현성 확보)
 
 #### 학습 환경 및 설정
 
 -Google Colab (GPU 런타임)
 -Ultralytics YOLO
 
-| 항목             | 값                  |
-| ---------------- | ------------------- |
-|Base model        |YOLOv8n (yolov8n.pt) |
-|epochs            |50                   |
-|imgsz             |640                  |
-|batch             |8                    |
+| 항목       | 값                   |
+| ---------- | -------------------- |
+| Base model | YOLOv8n (yolov8n.pt) |
+| epochs     | 50                   |
+| imgsz      | 640                  |
+| batch      | 8                    |
 
 #### 학습 절차
 
@@ -218,38 +211,39 @@
     metrics = model.val()
     print("mAP50:", metrics.box.map50)
     ```
-    
+
 #### 학습 결과
 
 검증 데이터셋(val) 기준 성능은 다음과 같다.
 
-| 지표             | 값                  |
-| ---------------- | ------------------- |
-|Precision         |0.999                |
-|Recall            |1.000                |
-|mAP50             |0.995                |
-|mAP50-95          |0.862                |
+| 지표      | 값    |
+| --------- | ----- |
+| Precision | 0.999 |
+| Recall    | 1.000 |
+| mAP50     | 0.995 |
+| mAP50-95  | 0.862 |
 
 단일 클래스(paper) 검출 과제로, 한 이미지에 종이 영역이 크게 한 개 존재하는 단순한 형태이기 때문에 mAP50가 매우 높게 측정되었다. 실제 사용 환경에서는 EasyOCR 단계의 품질 검사(재촬영 판단)와 함께 동작하여 인식 안정성을 보완한다.
 
 #### 산출물
+
 - 학습 결과 가중치: runs/detect/train/weights/best.pt
 - 이 best.pt를 OCR 모듈(ocr_pipeline.py)이 문서 영역 검출에 사용한다.
-
 
 ---
 
 ## 기술 스택
 
-| 구분             | 사용 기술           |
-| ---------------- | ------------------- |
-| Language         | Python              |
-| UI               | Streamlit           |
-| Object Detection | Ultralytics         |
-| Image Processing | OpenCV, NumPy       |
-| PDF Processing   | PyMuPDF             |
-| OCR              | EasyOCR             |
-| Collaboration    | Git, GitHub, Notion |
+| 구분                    | 사용 기술           |
+| ----------------------- | ------------------- |
+| Language                | Python              |
+| UI                      | Streamlit           |
+| Object Detection        | Ultralytics         |
+| Deep Learning Framework | PyTorch             |
+| Image Processing        | OpenCV, NumPy       |
+| PDF Processing          | PyMuPDF             |
+| OCR                     | EasyOCR             |
+| Collaboration           | Git, GitHub, Notion |
 
 ---
 
