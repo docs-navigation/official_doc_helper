@@ -183,7 +183,7 @@
 
 #### 학습 절차
 
-1.dataset.zip 압축 해제
+1.dataset.zip 압축 해제(데이터셋은 Git LFS로 관리되며 git lfs pull로 받아야 한다.)
 
 2.VOC(XML) 주석을 YOLO 라벨로 변환하고 train/val로 분할한 뒤 data.yaml 생성
 
