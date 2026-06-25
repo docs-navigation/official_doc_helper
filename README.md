@@ -184,33 +184,33 @@
 #### 학습 절차
 
 1.dataset.zip 압축 해제
+
 2.VOC(XML) 주석을 YOLO 라벨로 변환하고 train/val로 분할한 뒤 data.yaml 생성
 
-    ```yaml
+
     path: /content/dataset
     train: images/train
     val: images/val
     names:
       0: paper
-    ```
+
 
 3.모델 학습
 
-    ```python
+
     from ultralytics import YOLO
 
     model = YOLO("yolov8n.pt")
     model.train(data="/content/dataset/data.yaml",
                 epochs=50, imgsz=640, batch=8)
-    ```
+
 
 4.검증 (mAP50 측정)
 
-    ```python
+
     model = YOLO("/content/runs/detect/train/weights/best.pt")
     metrics = model.val()
     print("mAP50:", metrics.box.map50)
-    ```
 
 #### 학습 결과
 
