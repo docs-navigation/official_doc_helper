@@ -171,8 +171,8 @@
 
 #### 학습 환경 및 설정
 
--Google Colab (GPU 런타임)
--Ultralytics YOLO
+- Google Colab (GPU 런타임)
+- Ultralytics YOLO
 
 | 항목       | 값                   |
 | ---------- | -------------------- |
@@ -183,9 +183,9 @@
 
 #### 학습 절차
 
-1.dataset.zip 압축 해제(데이터셋은 Git LFS로 관리되며 git lfs pull로 받아야 한다.)
+1. dataset.zip 압축 해제(데이터셋은 Git LFS로 관리되며 git lfs pull로 받아야 한다.)
 
-2.VOC(XML) 주석을 YOLO 라벨로 변환하고 train/val로 분할한 뒤 data.yaml 생성
+2. VOC(XML) 주석을 YOLO 라벨로 변환하고 train/val로 분할한 뒤 data.yaml 생성
 
 
     path: /content/dataset
@@ -195,7 +195,7 @@
       0: paper
 
 
-3.모델 학습
+3. 모델 학습
 
 
     from ultralytics import YOLO
@@ -205,7 +205,7 @@
                 epochs=50, imgsz=640, batch=8)
 
 
-4.검증 (mAP50 측정)
+4. 검증 (mAP50 측정)
 
 
     model = YOLO("/content/runs/detect/train/weights/best.pt")
